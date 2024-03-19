@@ -320,22 +320,40 @@ class State {
         spriteScreenWidth = Math.idiv(spriteScreenWidth << fpx, s.uDiv_fp) | 1;
         // Place sprite on ground?
         let vMoveScreen = s.onGround ? Math.idiv(s.vDiv_fp * s.img.height, transformY_fp) : 0
-        let drawStartY = ((-spriteScreenHeight + h) >> 1) + this.horizon_offset + vMoveScreen
+        // Determine the drawing bounds on the screen.
+        let drawStartY = ((h - spriteScreenHeight) >> 1) + this.horizon_offset + vMoveScreen
+        let drawEndY = drawStartY + spriteScreenHeight
+        if (drawEndY >= h) {
+            drawEndY = h - 1
+        }
+        
         let drawStartX = spriteScreenX - (spriteScreenWidth >> 1)
         let drawStartX_offset = -drawStartX
         if (drawStartX < 0) {
             drawStartX = 0;
         }
         let drawEndX = spriteScreenX + (spriteScreenWidth >> 1)
-        if (drawEndX >= w) drawEndX = w - 1
+        if (drawEndX >= w) {
+            drawEndX = w - 1
+        }
         // loop through every vertical stripe of the sprite on screen
-        for(let stripe = drawStartX; stripe < drawEndX; stripe++)
+        for(let x = drawStartX; x <= drawEndX; x++)
         {
-            if (transformY_fp >= depth_map_fp[stripe]) {
+            if (transformY_fp >= depth_map_fp[x]) {
                 continue // behind a wall
             }
-            let texX = Math.idiv(s.img.width * (stripe + drawStartX_offset) << fpx, spriteScreenWidth) >> fpx
-            screen.blitRow(stripe, drawStartY, s.img, texX, spriteScreenHeight)
+            let texX = Math.idiv(s.img.width * (x + drawStartX_offset) << fpx, spriteScreenWidth) >> fpx
+
+            //screen.blitRow(x, drawStartY, s.img, texX, spriteScreenHeight)
+            // blitRow does not support transparency - so we draw the pixels manually.
+            for (let y = Math.max(0,drawStartY); y <= drawEndY; y++)
+            {
+                let texY = Math.idiv( (y - drawStartY) * s.img.height  << fpx, spriteScreenHeight) >> fpx
+                let c = s.img.getPixel(texX, texY)
+                if (c) { // Only draw when not transparent.
+                    screen.setPixel(x, y, c)
+                }
+            }
         }
     }
 }
@@ -352,7 +370,7 @@ game.onPaint(function () {
 
 controller.B.onEvent(ControllerButtonEvent.Pressed, () =>
 {
-    let s = new SpriteObject(assets.image`sprite`, st.x_fp, st.y_fp)
+    let s = new SpriteObject(animTextures[0][0], st.x_fp, st.y_fp)
     s.uDiv_fp = tofpx(3)
     s.vDiv_fp = tofpx(3)
     s.xVel_fp = st.dirX_fp << 2
